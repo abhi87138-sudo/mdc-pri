@@ -1,18 +1,26 @@
 """
 app.py
 =============================================================================
-Streamlit Web Application - Cyber Defense Platform
-Theme: Dynamic Dual-Mode (Crisp Dark & High-Clarity Light Mode)
+Streamlit Web Application - Sentinel Cyber Defense Platform
 Project: AI-Driven Social Engineering and Deepfake Defense Platform
 Team: Sentinels (Vivek Sharma, Hitesh Brahmi, Akhil Kotwal)
+Theme: Dynamic Dual-Mode (Deep Cyber Obsidian & High-Contrast Light Mode)
 =============================================================================
 """
 
 import os
 import json
 import random
+import io
 import streamlit as st
+from PIL import Image
+
 from src.predict import ThreatDetector
+from src.deepfake_detector import (
+    DeepfakeDetector,
+    generate_sample_synthetic_portrait,
+    generate_sample_authentic_portrait
+)
 
 # ---------------------------------------------------------------------------
 # Page Configuration
@@ -33,9 +41,12 @@ if "theme_mode" not in st.session_state:
 is_dark = (st.session_state["theme_mode"] == "dark")
 accent_color = "#38BDF8" if is_dark else "#0284C7"
 accent_indigo = "#818CF8" if is_dark else "#4F46E5"
+accent_emerald = "#10B981" if is_dark else "#059669"
+accent_rose = "#F43F5E" if is_dark else "#DC2626"
+accent_amber = "#F59E0B" if is_dark else "#D97706"
 
 # ---------------------------------------------------------------------------
-# SVG Graphics Library (Ultra-Crisp Vector SVGs)
+# SVG Vector Graphics Library (Ultra-Crisp SVGs - No generic emojis)
 # ---------------------------------------------------------------------------
 def svg_icon(name, color=None, size=22):
     c = color if color else accent_color
@@ -51,32 +62,36 @@ def svg_icon(name, color=None, size=22):
         "video": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>''',
         "mic": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>''',
         "activity": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>''',
-        "check": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'''
+        "check": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>''',
+        "camera": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>''',
+        "sparkles": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>''',
+        "globe": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>''',
+        "link": f'''<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'''
     }
     return icons.get(name, "")
 
 # ---------------------------------------------------------------------------
-# High-Clarity Typography & Theme Styles
+# High-Contrast Dual Theme CSS
 # ---------------------------------------------------------------------------
 if is_dark:
     theme_css = """
     :root {
         --bg-main: #0B0F19;
-        --card-bg: rgba(17, 24, 39, 0.85);
-        --card-border: rgba(56, 189, 248, 0.2);
+        --card-bg: rgba(17, 24, 39, 0.88);
+        --card-border: rgba(56, 189, 248, 0.22);
         --text-primary: #F8FAFC;
         --text-secondary: #94A3B8;
-        --hero-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 50%, rgba(15, 23, 42, 0.95) 100%);
+        --hero-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.92) 50%, rgba(15, 23, 42, 0.98) 100%);
         --metric-bg: rgba(15, 23, 42, 0.9);
         --flow-bg: rgba(15, 23, 42, 0.85);
         --pill-bg: rgba(15, 23, 42, 0.8);
         --tab-bg: rgba(15, 23, 42, 0.7);
-        --status-safe-bg: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 78, 59, 0.35) 100%);
-        --status-safe-border: rgba(16, 185, 129, 0.45);
-        --status-susp-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(120, 53, 15, 0.35) 100%);
-        --status-susp-border: rgba(245, 158, 11, 0.45);
-        --status-dang-bg: linear-gradient(90deg, rgba(244, 63, 94, 0.16) 0%, rgba(136, 19, 55, 0.4) 100%);
-        --status-dang-border: rgba(244, 63, 94, 0.5);
+        --status-safe-bg: linear-gradient(90deg, rgba(16, 185, 129, 0.16) 0%, rgba(6, 78, 59, 0.4) 100%);
+        --status-safe-border: rgba(16, 185, 129, 0.5);
+        --status-susp-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.16) 0%, rgba(120, 53, 15, 0.4) 100%);
+        --status-susp-border: rgba(245, 158, 11, 0.5);
+        --status-dang-bg: linear-gradient(90deg, rgba(244, 63, 94, 0.18) 0%, rgba(136, 19, 55, 0.45) 100%);
+        --status-dang-border: rgba(244, 63, 94, 0.55);
     }
     .stApp {
         background-color: #0B0F19 !important;
@@ -87,6 +102,11 @@ if is_dark:
     }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
         color: #FFFFFF !important;
+    }
+    textarea, input {
+        background-color: rgba(15, 23, 42, 0.95) !important;
+        color: #F8FAFC !important;
+        border: 1px solid rgba(56, 189, 248, 0.3) !important;
     }
     """
 else:
@@ -113,23 +133,37 @@ else:
         background-color: #F8FAFC !important;
         color: #0F172A !important;
     }
-    .stApp p, .stApp span, .stApp div, .stMarkdown p {
-        color: #1E293B !important;
+    .stApp p, .stApp span, .stApp div, .stMarkdown p, .stMarkdown li {
+        color: #334155 !important;
     }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
         color: #0F172A !important;
+        font-weight: 800 !important;
     }
-    .stCaption {
+    .stCaption, .stCaption p, [data-testid="stCaptionContainer"] p {
         color: #475569 !important;
     }
-    label[data-testid="stWidgetLabel"] p {
+    label[data-testid="stWidgetLabel"] p, label[data-testid="stWidgetLabel"] span {
         color: #0F172A !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
     }
-    textarea {
+    textarea, input {
         background-color: #FFFFFF !important;
         color: #0F172A !important;
-        border: 1px solid #CBD5E1 !important;
+        border: 1.5px solid #94A3B8 !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #0F172A !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #475569 !important;
+    }
+    .stButton > button {
+        background-color: #0284C7 !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        font-weight: 600 !important;
     }
     """
 
@@ -140,7 +174,7 @@ st.markdown(
 
     {theme_css}
 
-    /* Crisp font rendering on all monitors */
+    /* Crisp font rendering */
     * {{
         font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
         -webkit-font-smoothing: antialiased !important;
@@ -155,7 +189,7 @@ st.markdown(
     .block-container {{
         padding-top: 1.2rem;
         padding-bottom: 2.5rem;
-        max-width: 1100px;
+        max-width: 1120px;
     }}
 
     /* Hero Header */
@@ -163,17 +197,25 @@ st.markdown(
         position: relative;
         overflow: hidden;
         background: var(--hero-bg);
-        border: 1px solid rgba(56, 189, 248, 0.25);
+        border: 1px solid {'rgba(56, 189, 248, 0.35)' if is_dark else '#334155'};
         border-radius: 16px;
-        padding: 2rem 2.4rem;
+        padding: 2.2rem 2.4rem;
         margin-bottom: 1.5rem;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 10px 30px -10px {'rgba(0, 0, 0, 0.45)' if is_dark else 'rgba(15, 23, 42, 0.15)'};
+    }}
+
+    .hero-badge-wrap {{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 0.8rem;
     }}
 
     .hero-badge {{
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         padding: 4px 12px;
         background: rgba(56, 189, 248, 0.15);
         border: 1px solid rgba(56, 189, 248, 0.35);
@@ -183,15 +225,20 @@ st.markdown(
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: #38BDF8 !important;
-        margin-bottom: 0.6rem;
+    }}
+
+    .hero-badge-green {{
+        background: rgba(16, 185, 129, 0.15);
+        border-color: rgba(16, 185, 129, 0.35);
+        color: #34D399 !important;
     }}
 
     .hero-title {{
-        font-size: 2.1rem;
+        font-size: 2.15rem;
         font-weight: 800;
         letter-spacing: -0.02em;
         color: #FFFFFF !important;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.45rem;
     }}
 
     .hero-desc {{
@@ -199,7 +246,7 @@ st.markdown(
         font-size: 0.98rem;
         line-height: 1.6;
         margin-bottom: 0;
-        max-width: 860px;
+        max-width: 900px;
     }}
 
     /* Cyber Card */
@@ -210,13 +257,13 @@ st.markdown(
         padding: 1.4rem;
         margin-bottom: 1.1rem;
         transition: all 0.25s ease;
-        box-shadow: 0 4px 18px rgba(0,0,0,0.04);
+        box-shadow: 0 4px 18px {'rgba(0,0,0,0.2)' if is_dark else 'rgba(0,0,0,0.04)'};
     }}
 
     .cyber-card:hover {{
         transform: translateY(-2px);
         border-color: {accent_color};
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        box-shadow: 0 8px 24px {'rgba(56, 189, 248, 0.15)' if is_dark else 'rgba(0,0,0,0.08)'};
     }}
 
     .card-header-flex {{
@@ -273,7 +320,7 @@ st.markdown(
         padding: 1.3rem 1.1rem;
         text-align: center;
         transition: all 0.25s ease;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 16px {'rgba(0,0,0,0.18)' if is_dark else 'rgba(0,0,0,0.03)'};
     }}
 
     .metric-container:hover {{
@@ -295,6 +342,59 @@ st.markdown(
         letter-spacing: 0.06em;
     }}
 
+    /* Token Heatmap Styling */
+    .heatmap-box {{
+        background: var(--pill-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 1.2rem;
+        margin: 1rem 0;
+        line-height: 2.2;
+        font-size: 1.02rem;
+    }}
+
+    .token-normal {{
+        color: var(--text-primary) !important;
+        padding: 2px 4px;
+    }}
+
+    .token-urgency {{
+        background: rgba(239, 68, 68, 0.22);
+        color: #F87171 !important;
+        border: 1px solid rgba(239, 68, 68, 0.45);
+        border-radius: 6px;
+        padding: 2px 7px;
+        font-weight: 700;
+    }}
+
+    .token-financial {{
+        background: rgba(245, 158, 11, 0.22);
+        color: #FBBF24 !important;
+        border: 1px solid rgba(245, 158, 11, 0.45);
+        border-radius: 6px;
+        padding: 2px 7px;
+        font-weight: 700;
+    }}
+
+    .token-credential {{
+        background: rgba(168, 85, 247, 0.22);
+        color: #C084FC !important;
+        border: 1px solid rgba(168, 85, 247, 0.45);
+        border-radius: 6px;
+        padding: 2px 7px;
+        font-weight: 700;
+    }}
+
+    .token-link {{
+        background: rgba(56, 189, 248, 0.22);
+        color: #38BDF8 !important;
+        border: 1px solid rgba(56, 189, 248, 0.45);
+        border-radius: 6px;
+        padding: 2px 7px;
+        font-weight: 700;
+        text-decoration: underline;
+    }}
+
     /* Visual Flowchart */
     .flow-wrapper {{
         display: flex;
@@ -313,7 +413,7 @@ st.markdown(
         border-radius: 12px;
         padding: 1.3rem 1.1rem;
         text-align: center;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+        box-shadow: 0 4px 16px {'rgba(0,0,0,0.18)' if is_dark else 'rgba(0,0,0,0.04)'};
     }}
 
     .flow-badge {{
@@ -397,16 +497,21 @@ st.markdown(
 )
 
 # ---------------------------------------------------------------------------
-# Backend Threat Engine & Data
+# Backend Engines Initializer
 # ---------------------------------------------------------------------------
 @st.cache_resource
-def get_detector():
+def get_threat_detector():
     return ThreatDetector()
 
-detector = get_detector()
+@st.cache_resource
+def get_deepfake_detector():
+    return DeepfakeDetector()
+
+detector = get_threat_detector()
+deepfake_engine = get_deepfake_detector()
 
 # ---------------------------------------------------------------------------
-# Top Navigation & Theme Toggle Bar
+# Top Bar: Theme Toggle
 # ---------------------------------------------------------------------------
 col_brand, col_toggle = st.columns([8.2, 1.8])
 with col_brand:
@@ -427,12 +532,13 @@ with col_toggle:
 st.markdown(
     f"""
     <div class="hero-header">
-        <div class="hero-badge">
-            DEFENSIVE INTELLIGENCE // SENTINEL
+        <div class="hero-badge-wrap">
+            <span class="hero-badge">{svg_icon("shield", "#38BDF8", 15)} DEFENSIVE INTELLIGENCE // SENTINEL</span>
+            <span class="hero-badge hero-badge-green">{svg_icon("activity", "#34D399", 15)} OPERATIONAL // AIR-GAPPED FORENSICS</span>
         </div>
         <div class="hero-title">Social Engineering & Deepfake Defense</div>
         <p class="hero-desc">
-            An intelligent defensive platform analyzing incoming communication payloads in real time, neutralizing phishing traps, coercive social engineering, and synthetic media fraud.
+            An autonomous multi-vector defense platform inspecting deceptive communication payloads in real time. Fuses statistical NLP heuristics with frequency-domain computer vision to neutralize smishing traps, cognitive coercion, and synthetic media fraud.
         </p>
     </div>
     """,
@@ -442,30 +548,29 @@ st.markdown(
 # ---------------------------------------------------------------------------
 # Navigation Tabs
 # ---------------------------------------------------------------------------
-tab_overview, tab_demo, tab_threats, tab_arch, tab_bench, tab_deepfake, tab_about = st.tabs([
+tab_overview, tab_demo, tab_deepfake, tab_threats, tab_arch, tab_bench, tab_about = st.tabs([
     "Overview",
-    "Live Scanner",
+    "Live Phishing Scanner",
+    "Deepfake Lab",
     "Threat Intel",
     "How It Works",
     "Benchmarks",
-    "Deepfake Lab",
     "About"
 ])
 
 # ===========================================================================
-# TAB 1: OVERVIEW (Balanced: Professional Yet Accessible)
+# TAB 1: OVERVIEW
 # ===========================================================================
 with tab_overview:
-    st.markdown("### Platform Purpose & Architecture")
+    st.markdown("### Platform Purpose & Defensive Scope")
     st.markdown(
         """
         Traditional enterprise firewalls and antivirus tools are built to block malicious software binaries. 
-        However, modern cyber adversaries frequently bypass perimeter defenses by targeting human decision-making—leveraging 
-        **artificial urgency, institutional impersonation, and financial incentives** to extract credentials and authorize fraudulent transfers.
+        However, modern cyber adversaries frequently bypass perimeter defenses by targeting human psychology—leveraging 
+        **artificial urgency, institutional impersonation, and generative deepfakes** to bypass multi-factor authorization and execute fraudulent wire transfers.
 
-        **SENTINEL** provides an autonomous security filter that inspects incoming text communications in real time. 
-        By combining statistical language models with specialized behavioral threat heuristics, the engine detects deceptive patterns, 
-        evaluates risk severity from 0 to 100, and warns users before critical compromise occurs.
+        **SENTINEL** provides an autonomous security filter that inspects incoming text communications and digital media payloads in real time. 
+        By combining statistical language models with specialized behavioral threat heuristics and 2D FFT frequency forensics, the engine evaluates threat severity from 0 to 100 before critical compromise occurs.
         """
     )
     
@@ -476,10 +581,10 @@ with tab_overview:
             <div class="cyber-card">
                 <div class="card-header-flex">
                     {svg_icon("lock", accent_color, 22)}
-                    <h4 class="card-title">Local Privacy</h4>
+                    <h4 class="card-title">Air-Gapped Privacy</h4>
                 </div>
                 <p class="card-body">
-                    Executes entirely within the local host environment. Personal communications and inputs are never uploaded to third-party cloud APIs.
+                    Executes entirely within the local host environment. Personal communications, credentials, and video snapshots are never dispatched to external cloud APIs.
                 </p>
             </div>
             """,
@@ -491,10 +596,10 @@ with tab_overview:
             <div class="cyber-card">
                 <div class="card-header-flex">
                     {svg_icon("cpu", accent_indigo, 22)}
-                    <h4 class="card-title">Dual-Engine Analysis</h4>
+                    <h4 class="card-title">Dual-Vector Analysis</h4>
                 </div>
                 <p class="card-body">
-                    Fuses statistical Natural Language Processing with heuristic threat rules to maximize scam catch rates while minimizing false alarms.
+                    Combines statistical Natural Language Processing (TF-IDF + Naive Bayes) with 2D Fast Fourier Transform (FFT) computer vision forensics for comprehensive multi-threat defense.
                 </p>
             </div>
             """,
@@ -505,11 +610,11 @@ with tab_overview:
             f"""
             <div class="cyber-card">
                 <div class="card-header-flex">
-                    {svg_icon("radar", "#10B981", 22)}
-                    <h4 class="card-title">Explainable Scoring</h4>
+                    {svg_icon("radar", accent_emerald, 22)}
+                    <h4 class="card-title">Explainable Forensics</h4>
                 </div>
                 <p class="card-body">
-                    Delivers a calibrated threat score (0–100) alongside specific indicator justifications, eliminating ambiguous black-box verdicts.
+                    Delivers a calibrated threat score (0–100) alongside token heatmaps, psychological vector breakdowns, and spectral evidence maps—eliminating black-box opacity.
                 </p>
             </div>
             """,
@@ -518,10 +623,10 @@ with tab_overview:
 
     st.markdown(
         f"""
-        <div style="background: {'rgba(56, 189, 248, 0.08)' if is_dark else '#E0F2FE'}; border: 1px solid {'rgba(56, 189, 248, 0.22)' if is_dark else '#BAE6FD'}; border-radius: 10px; padding: 1rem 1.4rem; display: flex; align-items: center; gap: 12px; margin-top: 1rem;">
-            {svg_icon("activity", accent_color, 20)}
+        <div style="background: {'rgba(56, 189, 248, 0.08)' if is_dark else '#E0F2FE'}; border: 1px solid {'rgba(56, 189, 248, 0.22)' if is_dark else '#BAE6FD'}; border-radius: 10px; padding: 1.1rem 1.4rem; display: flex; align-items: center; gap: 14px; margin-top: 1rem;">
+            {svg_icon("sparkles", accent_color, 22)}
             <span style="color: {'#BAE6FD' if is_dark else '#0369A1'} !important; font-size: 0.94rem; font-weight: 500;">
-                <strong>Interactive Mode:</strong> Switch to the <strong>Live Scanner</strong> tab above to analyze custom text or evaluate adversarial test payloads.
+                <strong>Interactive Navigation:</strong> Head to <strong>Live Phishing Scanner</strong> to evaluate message payloads with interactive token heatmaps, or test <strong>Deepfake Lab</strong> to run 2D FFT forensic scans on video call snapshots!
             </span>
         </div>
         """,
@@ -529,11 +634,11 @@ with tab_overview:
     )
 
 # ===========================================================================
-# TAB 2: LIVE SCANNER
+# TAB 2: LIVE PHISHING SCANNER
 # ===========================================================================
 with tab_demo:
     st.markdown("### Interactive Threat Scanner")
-    st.caption("Paste any suspicious communication below, or click an adversarial generator button to cycle through realistic test cases:")
+    st.caption("Paste any suspicious communication below, or click a scenario button to cycle through realistic test payloads:")
 
     BANK_EXAMPLES = [
         "URGENT: Your HDFC Bank account has been temporarily locked due to suspicious activity. Verify KYC immediately at https://bit.ly/hdfc-kyc-update within 24 hours to prevent permanent suspension.",
@@ -547,13 +652,19 @@ with tab_demo:
         "Urgent Notification: You have won the 2nd prize of $250,000 in the International Cash Lottery. Send your full name, bank account, and phone number to claim-payout@lottery-fund.xyz."
     ]
 
+    DELIVERY_EXAMPLES = [
+        "USPS Notice: Your parcel shipment US-948194 is held at customs due to an unpaid duty fee of $2.45. Resolve payment immediately at http://usps-parcel-tracking.click to prevent package return.",
+        "FedEx Alert: Unable to deliver your order #849182 today due to missing house street number. Please update delivery address within 24 hours at https://bit.ly/fedex-update-addr.",
+        "DHL Express: An international package addressed to you has arrived at regional sorting facility with pending import fee. Visit https://dhl-express-duty.top to authorize release."
+    ]
+
     NORMAL_EXAMPLES = [
         "Hey Alex, are we still meeting in the college library at 4 PM to work on the computer science assignment?",
         "Mom, I finished my classes for today and I'm heading home on the metro. See you soon!",
         "Can you please email me the lecture notes from today's Operating Systems class when you get a chance? Thanks!"
     ]
 
-    ALL_EXAMPLES = BANK_EXAMPLES + PRIZE_EXAMPLES + NORMAL_EXAMPLES
+    ALL_EXAMPLES = BANK_EXAMPLES + PRIZE_EXAMPLES + DELIVERY_EXAMPLES + NORMAL_EXAMPLES
 
     if "input_message" not in st.session_state:
         st.session_state["input_message"] = ""
@@ -561,24 +672,30 @@ with tab_demo:
         st.session_state["bank_idx"] = 0
     if "prize_idx" not in st.session_state:
         st.session_state["prize_idx"] = 0
+    if "delivery_idx" not in st.session_state:
+        st.session_state["delivery_idx"] = 0
     if "normal_idx" not in st.session_state:
         st.session_state["normal_idx"] = 0
 
-    col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+    col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
     with col_b1:
-        if st.button("Bank Scam Sample", use_container_width=True):
+        if st.button("🏦 Bank Scam", use_container_width=True):
             st.session_state["input_message"] = BANK_EXAMPLES[st.session_state["bank_idx"]]
             st.session_state["bank_idx"] = (st.session_state["bank_idx"] + 1) % len(BANK_EXAMPLES)
     with col_b2:
-        if st.button("Prize Scam Sample", use_container_width=True):
+        if st.button("🎁 Prize Scam", use_container_width=True):
             st.session_state["input_message"] = PRIZE_EXAMPLES[st.session_state["prize_idx"]]
             st.session_state["prize_idx"] = (st.session_state["prize_idx"] + 1) % len(PRIZE_EXAMPLES)
     with col_b3:
-        if st.button("Normal Message", use_container_width=True):
+        if st.button("📦 Courier Scam", use_container_width=True):
+            st.session_state["input_message"] = DELIVERY_EXAMPLES[st.session_state["delivery_idx"]]
+            st.session_state["delivery_idx"] = (st.session_state["delivery_idx"] + 1) % len(DELIVERY_EXAMPLES)
+    with col_b4:
+        if st.button("💬 Normal Chat", use_container_width=True):
             st.session_state["input_message"] = NORMAL_EXAMPLES[st.session_state["normal_idx"]]
             st.session_state["normal_idx"] = (st.session_state["normal_idx"] + 1) % len(NORMAL_EXAMPLES)
-    with col_b4:
-        if st.button("Random Sample", use_container_width=True):
+    with col_b5:
+        if st.button("🎲 Random Sample", use_container_width=True):
             pool = [m for m in ALL_EXAMPLES if m != st.session_state["input_message"]]
             st.session_state["input_message"] = random.choice(pool if pool else ALL_EXAMPLES)
 
@@ -586,26 +703,32 @@ with tab_demo:
         "Payload Inspection Field:",
         value=st.session_state["input_message"],
         height=125,
-        placeholder="Type or paste suspicious message text here..."
+        placeholder="Type, paste, or select a sample message above to analyze..."
     )
 
-    scan_clicked = st.button("Scan Message", type="primary", use_container_width=True)
+    scan_clicked = st.button("🛡️ Execute Threat Scan", type="primary", use_container_width=True)
 
-    if scan_clicked:
+    if scan_clicked or (user_text.strip() and st.session_state.get("last_auto_scan") != user_text):
+        st.session_state["last_auto_scan"] = user_text
         if not user_text.strip():
             st.warning("⚠️ Input buffer is empty. Please enter text or click a sample button above.")
         else:
-            with st.spinner("Executing threat pattern analysis..."):
+            with st.spinner("Executing hybrid NLP and threat vector extraction..."):
                 result = detector.predict(user_text)
 
             risk_score = result["risk_score"]
             status = result["status"]
             ml_prob = result["ml_probability"]
             reasons = result["reasons"]
+            vectors = result["vectors"]
+            attack_vector = result["attack_vector"]
+            urls = result["urls"]
+            tokens = result["tokens"]
 
             st.write("---")
             st.markdown("### Threat Assessment Output")
 
+            # Top Verdict Banner
             if status == "Safe":
                 st.markdown(
                     f"""
@@ -613,10 +736,10 @@ with tab_demo:
                         {svg_icon("shield-check", "#10B981", 36)}
                         <div>
                             <div style="color: {'#10B981' if is_dark else '#065F46'} !important; font-weight: 800; font-size: 1.25rem;">
-                                VERDICT: SAFE // NO ANOMALY DETECTED
+                                VERDICT: SAFE // NO MALICIOUS ANOMALY DETECTED
                             </div>
                             <div style="color: {'#A7F3D0' if is_dark else '#047857'} !important; font-size: 0.92rem; margin-top: 2px;">
-                                Threat Score: <strong>{risk_score} / 100</strong> (Nominal conversational structure)
+                                Threat Score: <strong>{risk_score} / 100</strong> • Persona: <strong>{attack_vector['name']}</strong>
                             </div>
                         </div>
                     </div>
@@ -630,10 +753,10 @@ with tab_demo:
                         {svg_icon("alert", "#F59E0B", 36)}
                         <div>
                             <div style="color: {'#F59E0B' if is_dark else '#92400E'} !important; font-weight: 800; font-size: 1.25rem;">
-                                VERDICT: SUSPICIOUS // ELEVATED RISK
+                                VERDICT: SUSPICIOUS // ELEVATED RISK DETECTED
                             </div>
                             <div style="color: {'#FDE68A' if is_dark else '#B45309'} !important; font-size: 0.92rem; margin-top: 2px;">
-                                Threat Score: <strong>{risk_score} / 100</strong> (Caution advised. Secondary validation recommended)
+                                Threat Score: <strong>{risk_score} / 100</strong> • Persona: <strong>{attack_vector['name']}</strong> (Secondary validation recommended)
                             </div>
                         </div>
                     </div>
@@ -647,10 +770,10 @@ with tab_demo:
                         {svg_icon("alert", "#F43F5E", 36)}
                         <div>
                             <div style="color: {'#F43F5E' if is_dark else '#991B1B'} !important; font-weight: 800; font-size: 1.25rem;">
-                                VERDICT: DANGEROUS // HIGH SCAM RISK
+                                VERDICT: DANGEROUS // ACTIVE SOCIAL ENGINEERING ATTACK
                             </div>
                             <div style="color: {'#FECDD3' if is_dark else '#B91C1C'} !important; font-size: 0.92rem; margin-top: 2px;">
-                                Threat Score: <strong>{risk_score} / 100</strong> (Social engineering attack pattern confirmed)
+                                Threat Score: <strong>{risk_score} / 100</strong> • Attack Type: <strong>{attack_vector['name']}</strong> (Coercive pattern confirmed)
                             </div>
                         </div>
                     </div>
@@ -658,19 +781,119 @@ with tab_demo:
                     unsafe_allow_html=True
                 )
 
+            # Severity Progress
             st.write("**Threat Severity Gauge:**")
             st.progress(risk_score / 100.0)
 
+            # Attack Vector Classification Card
+            st.markdown(
+                f"""
+                <div class="cyber-card" style="border-left: 4px solid {attack_vector['color']};">
+                    <div class="card-header-flex">
+                        {svg_icon(attack_vector['icon'], attack_vector['color'], 24)}
+                        <div>
+                            <h4 class="card-title" style="color: {attack_vector['color']} !important;">{attack_vector['name']}</h4>
+                            <span style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">{attack_vector['badge']}</span>
+                        </div>
+                    </div>
+                    <p class="card-body">{attack_vector['summary']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # ---------------------------------------------------------------
+            # Feature: Interactive Threat Token Heatmap
+            # ---------------------------------------------------------------
+            st.markdown("#### 🔍 Interactive Payload Threat Heatmap")
+            st.caption("Inspected payload with token classification highlights:")
+            
+            heatmap_html = '<div class="heatmap-box">'
+            for word, tag in tokens:
+                if tag == "urgency":
+                    heatmap_html += f'<span class="token-urgency">{word}</span> '
+                elif tag == "financial":
+                    heatmap_html += f'<span class="token-financial">{word}</span> '
+                elif tag == "credential":
+                    heatmap_html += f'<span class="token-credential">{word}</span> '
+                elif tag == "link":
+                    heatmap_html += f'<span class="token-link">{word}</span> '
+                else:
+                    heatmap_html += f'<span class="token-normal">{word}</span> '
+            heatmap_html += '</div>'
+            st.markdown(heatmap_html, unsafe_allow_html=True)
+
+            # Heatmap Legend
+            st.markdown(
+                """
+                <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; margin-bottom: 1.2rem;">
+                    <span><strong style="color: #F87171;">■ Red:</strong> Urgency / Panic Pressure</span>
+                    <span><strong style="color: #FBBF24;">■ Amber:</strong> Financial / Prize Bait</span>
+                    <span><strong style="color: #C084FC;">■ Purple:</strong> Credential / Account Harvest</span>
+                    <span><strong style="color: #38BDF8;">■ Cyan:</strong> Embedded URL / Shortener</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # ---------------------------------------------------------------
+            # Feature: Psychological Vector Radar Meters
+            # ---------------------------------------------------------------
+            st.markdown("#### 🧠 Cognitive Manipulation Vector Profiling")
+            pv1, pv2, pv3, pv4 = st.columns(4)
+            with pv1:
+                st.metric("Urgency Pressure", f"{vectors['urgency']}%")
+                st.progress(vectors['urgency'] / 100.0)
+            with pv2:
+                st.metric("Financial Incentive", f"{vectors['financial']}%")
+                st.progress(vectors['financial'] / 100.0)
+            with pv3:
+                st.metric("Credential Harvest", f"{vectors['credential']}%")
+                st.progress(vectors['credential'] / 100.0)
+            with pv4:
+                st.metric("Authority Spoofing", f"{vectors['authority']}%")
+                st.progress(vectors['authority'] / 100.0)
+
+            # ---------------------------------------------------------------
+            # Feature: Deep URL Diagnostics
+            # ---------------------------------------------------------------
+            if urls:
+                st.markdown("#### 🔗 Deep URL & Domain Security Diagnostics")
+                for u in urls:
+                    url_color = "#EF4444" if u["risk_badge"] == "High Risk" else ("#F59E0B" if u["risk_badge"] == "Medium Risk" else "#10B981")
+                    st.markdown(
+                        f"""
+                        <div class="cyber-card" style="padding: 1rem 1.2rem; margin-bottom: 0.7rem; border-left: 3px solid {url_color};">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <div>
+                                    <code style="font-size: 0.95rem; color: {accent_color};">{u['url']}</code>
+                                    <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">
+                                        Shortener: <strong>{'Yes (Obfuscates true domain)' if u['is_shortener'] else 'No'}</strong> • 
+                                        Insecure HTTP: <strong>{'Yes' if u['is_insecure_http'] else 'No'}</strong> • 
+                                        Suspicious TLD: <strong>{'Yes' if u['is_suspicious_tld'] else 'No'}</strong>
+                                    </div>
+                                </div>
+                                <span style="padding: 3px 10px; background: {url_color}22; color: {url_color}; border: 1px solid {url_color}55; border-radius: 9999px; font-size: 0.76rem; font-weight: 700;">
+                                    {u['risk_badge']}
+                                </span>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            # ML & Heuristic Dual Metrics
+            st.write("")
             m_col1, m_col2 = st.columns(2)
             with m_col1:
-                st.metric("Calibrated Risk Score", f"{risk_score} / 100")
+                st.metric("Calibrated Hybrid Threat Score", f"{risk_score} / 100")
             with m_col2:
                 if ml_prob is not None:
                     st.metric("Statistical ML Scam Probability", f"{ml_prob * 100:.1f}%")
                 else:
                     st.metric("Statistical ML Scam Probability", "Rule-Only Fallback")
 
-            st.markdown("#### Threat Breakdown & Key Indicators")
+            st.markdown("#### Itemized Threat Breakdown & Indicators")
             for r in reasons:
                 st.markdown(
                     f"""
@@ -683,14 +906,210 @@ with tab_demo:
                 )
 
 # ===========================================================================
-# TAB 3: THREAT INTEL
+# TAB 3: DEEPFAKE LAB (NOW FULLY FUNCTIONAL!)
+# ===========================================================================
+with tab_deepfake:
+    st.markdown("### Multimodal Deepfake Defense & Visual Forensics")
+    st.caption("Forensic frame extraction & spectral analysis for executive video conference defense (Inspired by the 2024 Arup Incident):")
+
+    st.markdown(
+        f"""
+        <div class="cyber-card" style="background: {'rgba(56, 189, 248, 0.05)' if is_dark else '#F0F9FF'}; border-color: {'rgba(56, 189, 248, 0.3)' if is_dark else '#BAE6FD'};">
+            <div class="card-header-flex">
+                {svg_icon("video", accent_color, 24)}
+                <h4 class="card-title">Incident Response Protocol: Video Call Frame Forensics</h4>
+            </div>
+            <p class="card-body">
+                In high-profile social engineering attacks like the US$25M Arup video conference fraud, adversaries deploy real-time deepfake face swaps.
+                SENTINEL intercepts this threat by extracting snapshot frames and computing <strong>2D Fast Fourier Transform (FFT) power spectra, Laplacian seam blur variance, and sensor noise (PRNU) residuals</strong> that expose synthetic manipulation invisible to the human eye.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Input Mode Selection
+    input_mode = st.radio(
+        "Select Inspection Source:",
+        ["📁 Upload Image / Screenshot", "📷 Live Video Call Frame Capture (Webcam)", "🧪 Preset Forensic Test Samples"],
+        horizontal=True
+    )
+
+    image_to_analyze = None
+
+    if input_mode == "📁 Upload Image / Screenshot":
+        uploaded_file = st.file_uploader(
+            "Upload portrait or video call frame snapshot (PNG, JPG, JPEG):",
+            type=["png", "jpg", "jpeg"]
+        )
+        if uploaded_file is not None:
+            image_to_analyze = Image.open(uploaded_file)
+
+    elif input_mode == "📷 Live Video Call Frame Capture (Webcam)":
+        st.write("Capture a live frame from your webcam (simulates capturing an attendee in a video meeting):")
+        camera_snap = st.camera_input("Capture Video Call Frame")
+        if camera_snap is not None:
+            image_to_analyze = Image.open(camera_snap)
+
+    else:  # Preset Forensic Test Samples
+        st.write("Select a pre-configured sample to test the forensic engine immediately:")
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            if st.button("Load Authentic Reference Sample", use_container_width=True):
+                st.session_state["sample_choice"] = "authentic"
+        with col_s2:
+            if st.button("Load Synthetic GAN Deepfake Sample", use_container_width=True):
+                st.session_state["sample_choice"] = "synthetic"
+
+        if "sample_choice" not in st.session_state:
+            st.session_state["sample_choice"] = "synthetic"
+
+        if st.session_state["sample_choice"] == "authentic":
+            image_to_analyze = generate_sample_authentic_portrait()
+            st.info("Loaded: Authentic Reference Portrait (Simulates genuine optical camera capture).")
+        else:
+            image_to_analyze = generate_sample_synthetic_portrait()
+            st.warning("Loaded: Synthetic GAN Deepfake Portrait (Simulates periodic generator grid lattice & seam smoothing).")
+
+    # Analyze Button
+    if image_to_analyze is not None:
+        st.write("")
+        col_run, _ = st.columns([3, 7])
+        with col_run:
+            run_forensics = st.button("🔬 Execute Deepfake Forensics", type="primary", use_container_width=True)
+
+        if run_forensics or input_mode == "🧪 Preset Forensic Test Samples":
+            with st.spinner("Computing 2D FFT spectrum, Laplacian edge gradients, and chrominance consistency..."):
+                df_report = deepfake_engine.analyze_image(image_to_analyze)
+
+            overall_score = df_report["overall_score"]
+            status = df_report["status"]
+            color = df_report["color"]
+            verdict_label = df_report["verdict_label"]
+            metrics = df_report["metrics"]
+            reasons = df_report["reasons"]
+
+            st.write("---")
+            st.markdown("### Forensic Evidence & Spectral Diagnostics")
+
+            # Top Deepfake Verdict Banner
+            if status == "Likely Authentic":
+                st.markdown(
+                    f"""
+                    <div class="status-banner status-safe">
+                        {svg_icon("shield-check", "#10B981", 36)}
+                        <div>
+                            <div style="color: {'#10B981' if is_dark else '#065F46'} !important; font-weight: 800; font-size: 1.25rem;">
+                                {verdict_label}
+                            </div>
+                            <div style="color: {'#A7F3D0' if is_dark else '#047857'} !important; font-size: 0.92rem; margin-top: 2px;">
+                                Synthetic Likelihood: <strong>{overall_score} / 100</strong> (Continuous power falloff; natural optical lens grain)
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            elif status == "Suspicious":
+                st.markdown(
+                    f"""
+                    <div class="status-banner status-suspicious">
+                        {svg_icon("alert", "#F59E0B", 36)}
+                        <div>
+                            <div style="color: {'#F59E0B' if is_dark else '#92400E'} !important; font-weight: 800; font-size: 1.25rem;">
+                                {verdict_label}
+                            </div>
+                            <div style="color: {'#FDE68A' if is_dark else '#B45309'} !important; font-size: 0.92rem; margin-top: 2px;">
+                                Synthetic Likelihood: <strong>{overall_score} / 100</strong> (Borderline smoothing or mild frequency discrepancy)
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f"""
+                    <div class="status-banner status-dangerous">
+                        {svg_icon("alert", "#F43F5E", 36)}
+                        <div>
+                            <div style="color: {'#F43F5E' if is_dark else '#991B1B'} !important; font-weight: 800; font-size: 1.25rem;">
+                                {verdict_label}
+                            </div>
+                            <div style="color: {'#FECDD3' if is_dark else '#B91C1C'} !important; font-size: 0.92rem; margin-top: 2px;">
+                                Synthetic Likelihood: <strong>{overall_score} / 100</strong> (Synthetic upsampling artifacts and seam blending confirmed)
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            st.write("**Deepfake Probability Gauge:**")
+            st.progress(overall_score / 100.0)
+
+            # Visual Evidence Gallery (3 Columns)
+            st.markdown("#### Visual Evidence Inspection Gallery")
+            col_v1, col_v2, col_v3 = st.columns(3)
+            with col_v1:
+                st.image(df_report["face_crop"], caption="1. Analyzed Target Region", use_container_width=True)
+            with col_v2:
+                st.image(df_report["edge_image"], caption="2. Laplacian Boundary Edge Map", use_container_width=True)
+            with col_v3:
+                st.image(df_report["fft_image"], caption="3. 2D FFT Power Spectrum Heatmap", use_container_width=True)
+
+            st.caption("Above: (1) Cropped subject frame; (2) Laplacian gradient map exposing seam blur/sharpening; (3) 2D FFT revealing periodic checkerboard energy spikes.")
+
+            # 4 Core Forensic Metric Cards
+            st.markdown("#### Forensic Multi-Factor Diagnostic Scores")
+            df_m1, df_m2, df_m3, df_m4 = st.columns(4)
+            with df_m1:
+                st.metric("FFT Grid Regularity", f"{metrics['fft_score']}%", f"{metrics['high_freq_ratio']}% HF Energy")
+                st.progress(metrics['fft_score'] / 100.0)
+            with df_m2:
+                st.metric("Boundary Laplacian", f"{metrics['lap_score']}%", f"Var: {metrics['laplacian_variance']}")
+                st.progress(metrics['lap_score'] / 100.0)
+            with df_m3:
+                st.metric("Color Space Harmony", f"{metrics['color_score']}%", f"Diff: {metrics['color_discrepancy']}")
+                st.progress(metrics['color_score'] / 100.0)
+            with df_m4:
+                st.metric("Sensor Noise (PRNU)", f"{metrics['noise_score']}%", f"Var: {metrics['noise_variance']}")
+                st.progress(metrics['noise_score'] / 100.0)
+
+            st.markdown("#### Forensic Breakdown & Technical Findings")
+            for r in reasons:
+                st.markdown(
+                    f"""
+                    <div class="reason-pill">
+                        {svg_icon("activity", accent_color, 18)}
+                        <span>{r}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            # Defensive Takeaway
+            st.markdown(
+                f"""
+                <div style="background: {'rgba(56, 189, 248, 0.08)' if is_dark else '#E0F2FE'}; border: 1px solid {'rgba(56, 189, 248, 0.22)' if is_dark else '#BAE6FD'}; border-radius: 10px; padding: 1.1rem 1.4rem; margin-top: 1.2rem;">
+                    <strong style="color: {accent_color};">🛡️ Forensic Value Proposition:</strong>
+                    <span style="font-size: 0.92rem; color: var(--text-secondary);">
+                        Human perception fails to detect seamless face swaps on video calls. By exposing the mathematical footprint left by neural generator layers (2D FFT frequency spikes and Laplacian boundary variance), SENTINEL provides decisive out-of-band verification before authorizing high-value transactions.
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+# ===========================================================================
+# TAB 4: THREAT INTEL & CASE STUDIES
 # ===========================================================================
 with tab_threats:
     st.markdown("### The Modern Threat Landscape")
     st.markdown(
         """
-        Social engineering relies on **cognitive coercion**: manufacturing artificial urgency, authority impersonation, 
-        or fear of loss so targets make uncalculated choices without out-of-band verification.
+        Social engineering attacks exploit **cognitive vulnerabilities**: manufacturing artificial urgency, authority impersonation, 
+        or fear of financial loss so targets make uncalculated choices without out-of-band verification.
         """
     )
 
@@ -715,7 +1134,7 @@ with tab_threats:
             f"""
             <div class="cyber-card">
                 <div class="card-header-flex">
-                    {svg_icon("mic", "#F59E0B", 22)}
+                    {svg_icon("mic", accent_amber, 22)}
                     <h4 class="card-title">2. Voice Cloning</h4>
                 </div>
                 <p class="card-body">
@@ -730,11 +1149,11 @@ with tab_threats:
             f"""
             <div class="cyber-card">
                 <div class="card-header-flex">
-                    {svg_icon("video", "#F43F5E", 22)}
+                    {svg_icon("video", accent_rose, 22)}
                     <h4 class="card-title">3. Video Deepfakes</h4>
                 </div>
                 <p class="card-body">
-                    Synthetic face swaps mapped onto live conference video feeds, simulating leadership presence during sensitive fund transfer requests.
+                    Synthetic face swaps mapped onto live conference video feeds, simulating executive presence during sensitive fund transfer requests.
                 </p>
             </div>
             """,
@@ -742,7 +1161,7 @@ with tab_threats:
         )
 
     st.write("---")
-    st.markdown("### Case Study: The 2024 Arup Deepfake CFO Incident")
+    st.markdown("### Forensic Case Study: The 2024 Arup Deepfake CFO Incident")
     st.markdown(
         f"""
         <div class="status-banner status-dangerous" style="display:block; padding: 1.6rem;">
@@ -753,12 +1172,12 @@ with tab_threats:
             <p style="color:{'#CBD5E1' if is_dark else '#334155'} !important; font-size:0.95rem; line-height:1.6; margin:0;">
                 In early 2024, attackers breached the Hong Kong division of the multinational engineering firm <strong>Arup</strong>. 
                 A financial employee was initially skeptical of an urgent payment request, but attended a live multi-person video conference to verify. 
-                On the call, every participant—including the Chief Financial Officer and several recognizable colleagues—was an AI-rendered deepfake.
+                On the call, every single participant—including the Chief Financial Officer and several recognizable colleagues—was an AI-rendered deepfake.
                 <br><br>
                 Believing the visual and auditory confirmation, the employee executed 15 separate transactions totaling approximately 
                 <strong>US$25 million (HK$200 million)</strong>.
                 <br><br>
-                <strong>The Defensive Lesson:</strong> Visual and auditory confirmation alone is vulnerable to generative AI. Cryptographic verification, out-of-band challenge-response protocols, and automated text threat scanners are mandatory.
+                <strong>The Defensive Lesson:</strong> Visual and auditory confirmation alone is vulnerable to generative AI. Cryptographic verification, out-of-band challenge-response protocols, and automated frame snapshot forensics (such as SENTINEL's Deepfake Lab) are mandatory.
             </p>
         </div>
         """,
@@ -766,11 +1185,11 @@ with tab_threats:
     )
 
 # ===========================================================================
-# TAB 4: HOW IT WORKS
+# TAB 5: HOW IT WORKS
 # ===========================================================================
 with tab_arch:
     st.markdown("### Platform Architecture")
-    st.write("A structured 3-stage security pipeline designed to evaluate messages before critical compromise:")
+    st.write("A structured 3-stage security pipeline designed to evaluate messages and media before critical compromise:")
 
     st.markdown(
         f"""
@@ -779,21 +1198,21 @@ with tab_arch:
                 <span class="flow-badge">Stage 1</span>
                 <div style="margin: 6px 0;">{svg_icon("message", accent_color, 28)}</div>
                 <div class="flow-head">Payload Ingestion</div>
-                <p class="flow-txt">Inspects incoming SMS alerts, emails, or verification prompts.</p>
+                <p class="flow-txt">Inspects incoming SMS alerts, emails, verification prompts, and video snapshots.</p>
             </div>
             <div class="flow-connector">➔</div>
             <div class="flow-box">
                 <span class="flow-badge">Stage 2</span>
                 <div style="margin: 6px 0;">{svg_icon("cpu", accent_indigo, 28)}</div>
-                <div class="flow-head">Dual-Engine Check</div>
-                <p class="flow-txt">NLP checks word distributions while behavioral rules scan urgency and URLs.</p>
+                <div class="flow-head">Dual-Vector Analysis</div>
+                <p class="flow-txt">NLP evaluates linguistic patterns while 2D FFT & Laplacian scans inspect video frames.</p>
             </div>
             <div class="flow-connector">➔</div>
             <div class="flow-box">
                 <span class="flow-badge">Stage 3</span>
-                <div style="margin: 6px 0;">{svg_icon("shield-check", "#10B981", 28)}</div>
-                <div class="flow-head">Threat Assessment</div>
-                <p class="flow-txt">Outputs a calibrated 0–100 threat score and itemized indicators.</p>
+                <div style="margin: 6px 0;">{svg_icon("shield-check", accent_emerald, 28)}</div>
+                <div class="flow-head">Forensic Threat Assessment</div>
+                <p class="flow-txt">Outputs a calibrated 0–100 threat score, token heatmaps, and itemized indicators.</p>
             </div>
         </div>
         """,
@@ -808,10 +1227,10 @@ with tab_arch:
             <div class="cyber-card">
                 <div class="card-header-flex">
                     {svg_icon("cpu", accent_color, 22)}
-                    <h4 class="card-title">Statistical NLP Classification</h4>
+                    <h4 class="card-title">1. Statistical NLP & Heuristic Classifier</h4>
                 </div>
                 <p class="card-body">
-                    Trained on thousands of labeled safe and scam communications. Utilizes TF-IDF token representation to detect deceptive linguistic patterns like <em>"account suspended"</em>, <em>"verify kyc"</em>, or <em>"claim reward"</em>.
+                    Trained on thousands of labeled safe and scam communications. Utilizes TF-IDF token representation alongside heuristic psychological vectors: urgency pressure (<em>"within 24 hours"</em>), credential harvesting prompts (PINs/OTPs), financial fee lures, and shortened or suspicious URLs.
                 </p>
             </div>
             """,
@@ -822,11 +1241,11 @@ with tab_arch:
             f"""
             <div class="cyber-card">
                 <div class="card-header-flex">
-                    {svg_icon("shield", "#10B981", 22)}
-                    <h4 class="card-title">Behavioral Threat Heuristics</h4>
+                    {svg_icon("video", accent_emerald, 22)}
+                    <h4 class="card-title">2. 2D FFT & Boundary Vision Forensics</h4>
                 </div>
                 <p class="card-body">
-                    Scans for explicit social engineering psychological vectors: artificial urgency (<em>"within 24 hours"</em>), credential harvesting prompts (PINs/OTPs), financial fee lures, and shortened or suspicious URLs.
+                    Transforms video call snapshot frames into frequency space via 2D Fast Fourier Transform to expose periodic GAN upsampling lattice spikes. Analyzes Laplacian edge gradients to detect blending mask blurriness and chrominance illumination mismatches.
                 </p>
             </div>
             """,
@@ -834,7 +1253,7 @@ with tab_arch:
         )
 
 # ===========================================================================
-# TAB 5: BENCHMARKS
+# TAB 6: BENCHMARKS & AI ADVISORY
 # ===========================================================================
 with tab_bench:
     st.markdown("### Empirical Performance Benchmarks")
@@ -874,6 +1293,7 @@ with tab_bench:
 
     st.write("")
 
+    # Crucial Advisory Box (Requested by user)
     st.markdown(
         f"""
         <div style="background: {'rgba(245, 158, 11, 0.1)' if is_dark else '#FFFBEB'}; border: 1px solid {'rgba(245, 158, 11, 0.35)' if is_dark else '#F59E0B'}; border-radius: 12px; padding: 1.4rem; margin: 1rem 0;">
@@ -902,62 +1322,7 @@ with tab_bench:
     )
 
 # ===========================================================================
-# TAB 6: DEEPFAKE LAB
-# ===========================================================================
-with tab_deepfake:
-    st.markdown("### Multimodal Deepfake Defense")
-    st.markdown(
-        f"""
-        <div class="status-banner status-suspicious">
-            {svg_icon("alert", "#F59E0B", 30)}
-            <div>
-                <div style="color: {'#F59E0B' if is_dark else '#92400E'} !important; font-weight: 800; font-size: 1.1rem;">
-                    STATUS: IN ACTIVE RESEARCH // VERSION 2.0 ROADMAP
-                </div>
-                <div style="color: {'#FDE68A' if is_dark else '#B45309'} !important; font-size: 0.92rem; margin-top: 3px;">
-                    Version 1.0 of the platform provides text and SMS phishing detection. Multimodal audio and video deepfake verification engines are under active research for future deployment.
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown("### Planned Detection Architectures (v2.0)")
-    df1, df2 = st.columns(2)
-    with df1:
-        st.markdown(
-            f"""
-            <div class="cyber-card">
-                <div class="card-header-flex">
-                    {svg_icon("mic", accent_color, 24)}
-                    <h4 class="card-title">Audio Spectral Verification</h4>
-                </div>
-                <p class="card-body">
-                    Designed to identify cloned voices in vishing attacks through spectral cutoffs, acoustic jitter/shimmer micro-stability, and neural vocoder artifacts.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    with df2:
-        st.markdown(
-            f"""
-            <div class="cyber-card">
-                <div class="card-header-flex">
-                    {svg_icon("video", accent_indigo, 24)}
-                    <h4 class="card-title">Visual Biometric Verification</h4>
-                </div>
-                <p class="card-body">
-                    Designed to identify synthetic face replacements in video conferences through eye-blink frequencies, boundary blending resolution, and lip-sync alignment.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-# ===========================================================================
-# TAB 7: ABOUT (Clean, Simple, Names Only)
+# TAB 7: ABOUT (Clean, Symmetrical, Names Only)
 # ===========================================================================
 with tab_about:
     st.markdown("### About the Project")
@@ -993,7 +1358,7 @@ with tab_about:
         st.markdown(
             f"""
             <div class="cyber-card" style="text-align: center; padding: 1.8rem 1.2rem;">
-                <div style="margin-bottom: 0.8rem;">{svg_icon("users", "#10B981", 32)}</div>
+                <div style="margin-bottom: 0.8rem;">{svg_icon("users", accent_emerald, 32)}</div>
                 <h3 style="margin: 0; color: var(--text-primary) !important; font-size: 1.25rem; font-weight: 700;">Akhil Kotwal</h3>
             </div>
             """,
@@ -1010,7 +1375,7 @@ with tab_about:
             <p class="card-body">
                 • <strong>Project:</strong> AI-Driven Social Engineering and Deepfake Defense Platform<br>
                 • <strong>Team:</strong> Sentinels<br>
-                • <strong>Core Stack:</strong> Python, Streamlit, Scikit-Learn<br>
+                • <strong>Core Stack:</strong> Python, Streamlit, Scikit-Learn, NumPy, Pillow, SciPy<br>
                 • <strong>Deployment:</strong> 100% Offline / Local Execution (Zero External Cloud APIs)
             </p>
         </div>
