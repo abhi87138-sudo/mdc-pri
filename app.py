@@ -14,18 +14,34 @@ import json
 import random
 import io
 import time
+import sys
 from datetime import datetime
 import streamlit as st
 from PIL import Image
 
-from src.predict import ThreatDetector, DeepUrlScanner, SecurityAssistant
-from src.deepfake_detector import (
-    DeepfakeDetector,
-    generate_sample_synthetic_portrait,
-    generate_sample_authentic_portrait,
-    generate_sample_synthetic_audio,
-    generate_sample_authentic_audio
-)
+# Ensure root directory is in Python search path for Streamlit Cloud
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+try:
+    from src.predict import ThreatDetector, DeepUrlScanner, SecurityAssistant
+    from src.deepfake_detector import (
+        DeepfakeDetector,
+        generate_sample_synthetic_portrait,
+        generate_sample_authentic_portrait,
+        generate_sample_synthetic_audio,
+        generate_sample_authentic_audio
+    )
+except ImportError:
+    from predict import ThreatDetector, DeepUrlScanner, SecurityAssistant
+    from deepfake_detector import (
+        DeepfakeDetector,
+        generate_sample_synthetic_portrait,
+        generate_sample_authentic_portrait,
+        generate_sample_synthetic_audio,
+        generate_sample_authentic_audio
+    )
 
 # ---------------------------------------------------------------------------
 # Page Configuration
