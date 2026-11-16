@@ -542,6 +542,7 @@ def generate_sample_authentic_audio():
     buf.seek(0)
     return buf
 
+def generate_sample_synthetic_portrait():
     """
     Generates a synthetic test portrait pattern simulating generative GAN artifacts
     (periodic frequency grid and boundary smoothing) for instant offline demo evaluation.
