@@ -370,7 +370,178 @@ class DeepfakeDetector:
         return noise_score, {"var": noise_var, "desc": desc}
 
 
-def generate_sample_synthetic_portrait():
+    def analyze_audio(self, audio_input):
+        """
+        Forensic acoustic evaluation of voice clips & audio recordings.
+        Inspects spectral bandwidth cutoff (vocoder signatures), background room noise,
+        and zero-crossing rate stability characteristic of synthetic voice clones.
+        """
+        try:
+            import wave
+            audio_bytes = None
+            if hasattr(audio_input, "read"):
+                audio_input.seek(0)
+                audio_bytes = audio_input.read()
+            elif isinstance(audio_input, (bytes, bytearray)):
+                audio_bytes = audio_input
+
+            if not audio_bytes:
+                raise ValueError("No audio bytes available.")
+
+            with wave.open(io.BytesIO(audio_bytes), "rb") as wf:
+                n_channels = wf.getnchannels()
+                sampwidth = wf.getsampwidth()
+                framerate = wf.getframerate()
+                n_frames = wf.getnframes()
+                raw_frames = wf.readframes(min(n_frames, framerate * 5))  # analyze up to 5s
+
+            if sampwidth == 2:
+                samples = np.frombuffer(raw_frames, dtype=np.int16).astype(np.float32)
+            else:
+                samples = np.frombuffer(raw_frames, dtype=np.uint8).astype(np.float32) - 128.0
+
+            if n_channels > 1:
+                samples = samples[::n_channels]
+
+            # Normalize
+            if np.max(np.abs(samples)) > 0:
+                samples = samples / np.max(np.abs(samples))
+
+            # 1. 1D FFT frequency distribution
+            fft_vals = np.abs(np.fft.rfft(samples))
+            freqs = np.fft.rfftfreq(len(samples), 1.0 / framerate)
+
+            # Check frequency cutoff (many voice cloning TTS models cutoff steeply above 8kHz or 16kHz)
+            high_cutoff_freq = 8000
+            idx_cutoff = np.where(freqs >= high_cutoff_freq)[0]
+            if len(idx_cutoff) > 0:
+                high_energy_ratio = float(np.sum(fft_vals[idx_cutoff]) / (np.sum(fft_vals) + 1e-6))
+            else:
+                high_energy_ratio = 0.0
+
+            # 2. Silence floor unnaturalness (AI speech models often have 100% synthetic zero noise floor)
+            abs_samples = np.abs(samples)
+            silence_samples = np.sum(abs_samples < 0.005)
+            silence_ratio = float(silence_samples / len(samples))
+
+            # 3. Zero-Crossing Rate variance
+            zero_crossings = np.nonzero(np.diff(samples > 0))[0]
+            if len(zero_crossings) > 10:
+                intervals = np.diff(zero_crossings)
+                interval_jitter = float(np.std(intervals) / (np.mean(intervals) + 1e-5))
+            else:
+                interval_jitter = 0.5
+
+            # Scoring
+            score = 15
+            reasons = []
+
+            # Harsh cutoff evaluation
+            if high_energy_ratio < 0.015 and framerate >= 22050:
+                score += 35
+                reasons.append(f"Steep high-frequency spectral cutoff detected (< 8 kHz). Classic neural vocoder synthesis signature.")
+            else:
+                reasons.append("Natural acoustic frequency spread extending into higher spectrum registers.")
+
+            # Synthetic silence floor
+            if silence_ratio > 0.35 and np.min(abs_samples[:1000]) == 0.0:
+                score += 30
+                reasons.append("Unnaturally sterile silence floor detected. Lacks physical room acoustic reverberation.")
+            else:
+                reasons.append("Natural environmental background acoustic noise present.")
+
+            # Jitter
+            if interval_jitter < 0.35:
+                score += 20
+                reasons.append("Hyper-regular pitch micro-timing observed (typical of deterministic algorithmic speech synthesis).")
+
+            overall_score = min(100, max(0, score))
+            if overall_score >= 65:
+                status = "High Risk Synthetic Voice"
+                color = "#EF4444"
+                verdict = "SYNTHETIC VOICE CLONE DETECTED"
+            elif overall_score >= 35:
+                status = "Suspicious Audio"
+                color = "#F59E0B"
+                verdict = "SUSPICIOUS ACOUSTIC ANOMALIES"
+            else:
+                status = "Likely Authentic Audio"
+                color = "#06B6D4"
+                verdict = "AUTHENTIC HUMAN VOICE SIGNATURE"
+
+            return {
+                "overall_score": overall_score,
+                "status": status,
+                "color": color,
+                "verdict_label": verdict,
+                "sample_rate": framerate,
+                "duration": round(n_frames / framerate, 2),
+                "high_energy_ratio": round(high_energy_ratio * 100, 2),
+                "silence_ratio": round(silence_ratio * 100, 2),
+                "interval_jitter": round(interval_jitter, 3),
+                "reasons": reasons
+            }
+        except Exception as e:
+            return {
+                "overall_score": 50,
+                "status": "Suspicious Audio",
+                "color": "#F59E0B",
+                "verdict_label": "AUDIO ANALYSIS NOTICE",
+                "sample_rate": 44100,
+                "duration": 0.0,
+                "high_energy_ratio": 0.0,
+                "silence_ratio": 0.0,
+                "interval_jitter": 0.0,
+                "reasons": [f"Could not parse audio waveform completely: {e}. Ensure standard uncompressed WAV format."]
+            }
+
+
+def generate_sample_synthetic_audio():
+    """Generates an in-memory WAV simulating synthetic voice clone characteristics (16kHz cutoff, pure silence)."""
+    import wave
+    import struct
+    framerate = 22050
+    duration = 2.0
+    t = np.linspace(0, duration, int(framerate * duration), endpoint=False)
+    # Fundamental voice harmonics (150Hz + overtones) but strictly cutoff at 3.5kHz
+    wave_data = np.sin(2 * np.pi * 160 * t) * 0.4 + np.sin(2 * np.pi * 320 * t) * 0.2 + np.sin(2 * np.pi * 640 * t) * 0.1
+    # Introduce unnaturally dead silence gaps
+    wave_data[int(framerate * 0.8):int(framerate * 1.2)] = 0.0
+    
+    scaled = (wave_data * 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(framerate)
+        wf.writeframes(scaled.tobytes())
+    buf.seek(0)
+    return buf
+
+
+def generate_sample_authentic_audio():
+    """Generates an in-memory WAV simulating natural human acoustic recording with room noise."""
+    import wave
+    framerate = 44100
+    duration = 2.0
+    t = np.linspace(0, duration, int(framerate * duration), endpoint=False)
+    # Voice with natural vibrato and wideband room noise
+    vibrato = 1.0 + 0.03 * np.sin(2 * np.pi * 5 * t)
+    wave_data = np.sin(2 * np.pi * 180 * vibrato * t) * 0.35 + np.sin(2 * np.pi * 360 * t) * 0.15 + np.sin(2 * np.pi * 720 * t) * 0.08
+    # Add natural room acoustic noise floor
+    room_noise = np.random.normal(0, 0.012, len(t))
+    wave_data = np.clip(wave_data + room_noise, -1.0, 1.0)
+    
+    scaled = (wave_data * 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(framerate)
+        wf.writeframes(scaled.tobytes())
+    buf.seek(0)
+    return buf
+
     """
     Generates a synthetic test portrait pattern simulating generative GAN artifacts
     (periodic frequency grid and boundary smoothing) for instant offline demo evaluation.
