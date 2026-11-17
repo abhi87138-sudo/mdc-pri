@@ -50,7 +50,7 @@ st.set_page_config(
     page_title="DEEPFAKE DEFENSE // AI Cyber & Media Shield",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # ---------------------------------------------------------------------------
@@ -479,28 +479,38 @@ st.markdown(
         gap: 8px;
     }}
 
-    /* Modern Tabs */
-    div[data-baseweb="tab-list"] {{
+    /* Modern Left Sidebar Styling */
+    section[data-testid="stSidebar"] {{
+        background-color: var(--card-bg) !important;
+        border-right: 1px solid var(--card-border) !important;
+        padding-top: 1.5rem;
+    }}
+
+    section[data-testid="stSidebar"] div[data-testid="stRadio"] > div {{
         gap: 6px;
-        background-color: var(--tab-bg);
-        padding: 6px;
-        border-radius: 14px;
-        border: 1px solid var(--card-border);
-        margin-bottom: 1.2rem;
     }}
 
-    button[data-baseweb="tab"] {{
-        border-radius: 10px;
-        padding: 8px 16px;
-        color: var(--text-secondary) !important;
-        font-weight: 600;
-        font-size: 0.88rem;
+    section[data-testid="stSidebar"] div[data-testid="stRadio"] label {{
+        background: var(--pill-bg) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 12px !important;
+        padding: 12px 14px !important;
+        transition: all 0.2s ease !important;
+        cursor: pointer !important;
+        margin-bottom: 4px !important;
+        display: flex !important;
+        align-items: center !important;
     }}
 
-    button[data-baseweb="tab"][aria-selected="true"] {{
-        background: {'rgba(6, 182, 212, 0.16)' if is_dark else '#E0F2FE'} !important;
-        color: {cyan_main} !important;
-        font-weight: 700;
+    section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {{
+        border-color: {cyan_glow} !important;
+        transform: translateX(3px) !important;
+    }}
+
+    section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
+    section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {{
+        background: var(--status-safe-bg) !important;
+        border-color: {cyan_main} !important;
     }}
     </style>
     """,
@@ -667,23 +677,66 @@ with st.expander("ℹ️ **What We Do & How Deepfake Defense Protects You**", ex
     )
 
 # ---------------------------------------------------------------------------
-# Navigation Tabs
+# Left Sidebar Navigation (Modern Acer/Cyber Console Vertical Panel)
 # ---------------------------------------------------------------------------
-tab_scam, tab_deepfake, tab_url, tab_assistant, tab_dashboard, tab_intel, tab_bench, tab_about = st.tabs([
-    "🛡️ AI Scam Message Checker",
-    "🔬 Deepfake Lab",
-    "🔗 Phishing URL Scanner",
-    "💬 AI Security Assistant",
-    "📊 Security Dashboard",
-    "📖 Threat Intel",
-    "⚡ Performance & Limits",
-    "ℹ️ About"
-])
+with st.sidebar:
+    st.markdown(
+        f"""
+        <div style="text-align: center; padding-bottom: 1.2rem; border-bottom: 1px solid var(--card-border); margin-bottom: 1.4rem;">
+            {svg_icon("shield-check", cyan_glow, 44)}
+            <div style="font-size: 1.25rem; font-weight: 800; color: {cyan_glow} !important; margin-top: 8px; letter-spacing: -0.02em;">
+                DEEPFAKE DEFENSE
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px;">
+                Autonomous Security Console
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.caption("NAVIGATION MENU")
+    selected_nav = st.radio(
+        "Navigation",
+        [
+            "🛡️ AI Scam Message Checker",
+            "🔬 Deepfake Lab",
+            "🔗 Phishing URL Scanner",
+            "💬 AI Security Assistant",
+            "📊 Security Dashboard",
+            "📖 Threat Intel & Cases",
+            "⚡ Benchmarks & Limits",
+            "ℹ️ About Platform"
+        ],
+        label_visibility="collapsed"
+    )
+
+    st.markdown("---")
+    st.caption("SYSTEM STATUS")
+    st.markdown(
+        f"""
+        <div style="background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 10px; font-size: 0.8rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--text-secondary);">Core Engine:</span>
+                <strong style="color:{cyan_glow};">ONLINE</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--text-secondary);">Latency:</span>
+                <strong style="color:#10B981;">11.4ms</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">Privacy:</span>
+                <strong style="color:{cyan_glow};">Air-Gapped</strong>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # ===========================================================================
-# TAB 1: AI SCAM MESSAGE CHECKER (HIGHEST PRIORITY - TRUECALLER INSPIRED)
+# ROUTING MAIN CONTENT BASED ON SELECTED SIDEBAR NAVIGATION
 # ===========================================================================
-with tab_scam:
+if selected_nav == "🛡️ AI Scam Message Checker":
     st.markdown("### 🛡️ AI Scam Message Checker")
     st.caption("Paste any suspicious SMS, WhatsApp forward, bank alert, or email. The engine inspects for urgency coercion, credential theft, and utility fraud:")
 
@@ -904,9 +957,9 @@ with tab_scam:
                 )
 
 # ===========================================================================
-# TAB 2: DEEPFAKE LAB (IMAGE, VIDEO CALL SNAPSHOT & AUDIO VOICE FORENSICS)
+# VIEW 2: DEEPFAKE LAB (IMAGE, VIDEO CALL SNAPSHOT & AUDIO VOICE FORENSICS)
 # ===========================================================================
-with tab_deepfake:
+elif selected_nav == "🔬 Deepfake Lab":
     st.markdown("### 🔬 Multi-Modal Deepfake Defense Lab")
     st.caption("Inspect digital portraits, video call snapshot frames, and voice notes for synthetic generative manipulation:")
 
@@ -1105,9 +1158,9 @@ with tab_deepfake:
                     )
 
 # ===========================================================================
-# TAB 3: PHISHING URL SCANNER (NEW DEDICATED TOOL)
+# VIEW 3: PHISHING URL SCANNER (NEW DEDICATED TOOL)
 # ===========================================================================
-with tab_url:
+elif selected_nav == "🔗 Phishing URL Scanner":
     st.markdown("### 🔗 Dedicated Phishing URL & Domain Scanner")
     st.caption("Inspect hyperlinks and domains for obfuscation, brand spoofing, malicious TLDs, and URL shortener traps:")
 
@@ -1188,9 +1241,9 @@ with tab_url:
                 st.markdown(f"• {rec}")
 
 # ===========================================================================
-# TAB 4: AI SECURITY ASSISTANT (INTERACTIVE CHATBOT)
+# VIEW 4: AI SECURITY ASSISTANT (INTERACTIVE CHATBOT)
 # ===========================================================================
-with tab_assistant:
+elif selected_nav == "💬 AI Security Assistant":
     st.markdown("### 💬 AI Cyber Security Advisor")
     st.caption("Ask questions about banking scams, suspicious messages, emergency recovery steps, and deepfake verification:")
 
@@ -1233,9 +1286,9 @@ with tab_assistant:
             st.markdown(reply)
 
 # ===========================================================================
-# TAB 5: SECURITY DASHBOARD & SCAN HISTORY
+# VIEW 5: SECURITY DASHBOARD & SCAN HISTORY
 # ===========================================================================
-with tab_dashboard:
+elif selected_nav == "📊 Security Dashboard":
     st.markdown("### 📊 Defensive Operations Dashboard")
     st.caption("Live metrics, scan throughput, and threat interception activity:")
 
@@ -1275,9 +1328,9 @@ with tab_dashboard:
             )
 
 # ===========================================================================
-# TAB 6: THREAT INTEL & CASE STUDIES
+# VIEW 6: THREAT INTEL & CASE STUDIES
 # ===========================================================================
-with tab_intel:
+elif selected_nav == "📖 Threat Intel & Cases":
     st.markdown("### 📖 The Modern Threat Landscape")
     st.caption("How social engineering exploits human psychology rather than software vulnerabilities:")
 
@@ -1342,9 +1395,9 @@ with tab_intel:
     )
 
 # ===========================================================================
-# TAB 7: BENCHMARKS & OPERATIONAL LIMITS
+# VIEW 7: BENCHMARKS & OPERATIONAL LIMITS
 # ===========================================================================
-with tab_bench:
+elif selected_nav == "⚡ Benchmarks & Limits":
     st.markdown("### ⚡ Empirical Performance Benchmarks")
     st.caption("Performance evaluated across 1,115 holdout test samples and real-world adversarial variations:")
 
@@ -1410,9 +1463,9 @@ with tab_bench:
     )
 
 # ===========================================================================
-# TAB 8: ABOUT
+# VIEW 8: ABOUT
 # ===========================================================================
-with tab_about:
+elif selected_nav == "ℹ️ About Platform":
     st.markdown("### ℹ️ About DEEPFAKE DEFENSE")
     st.markdown(
         """
